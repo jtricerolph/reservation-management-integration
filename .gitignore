@@ -51,3 +51,7 @@ backup*/
 # Exclude backup files
 *.bak
 *.backup
+
+# Exclude all markdown documentation except CHANGELOG
+*.md
+!CHANGELOG.md
