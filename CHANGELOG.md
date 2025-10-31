@@ -1766,7 +1766,7 @@ Each suggestion row with content now includes a checkbox on the right side, allo
 <input type="checkbox"
        class="suggestion-checkbox"
        data-field="phone"
-       data-value="07123456789"
+       data-value="01234567891"
        checked>
 ```
 
@@ -1800,7 +1800,7 @@ for the restaurant reservation for Room 101.
 Updates to apply:
 
 • name: John Smith
-• phone: 07123456789
+• phone: 01234567891
 • hotel_guest: Yes
 
 API integration coming in next version.

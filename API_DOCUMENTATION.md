@@ -78,7 +78,7 @@ array(
                     "firstName": "John",
                     "lastName": "Smith",
                     "email": "john.smith@email.com",
-                    "phone": "07700900123",
+                    "phone": "01234567891",
                     "isPrimary": true
                 }
             ],
@@ -223,7 +223,7 @@ array(
             "guest": {
                 "name": "John Smith",
                 "email": "john@email.com",
-                "phone": "+447700900123"
+                "phone": "+441234567891"
             },
             "time": "18:30",
             "partySize": 2,
@@ -279,7 +279,7 @@ array(
 {
     "name": "John Smith",
     "email": "john@email.com",
-    "phone": "+447700900123",
+    "phone": "+441234567891",
     "time": "2025-10-31 18:30",
     "partySize": 2,
     "openingHourId": "evening_service_id",
@@ -719,7 +719,7 @@ public function get_resos_available_times($date, $people)
 $booking_data = array(
     'name' => 'John Smith',
     'email' => 'john@email.com',
-    'phone' => '+447700900123',
+    'phone' => '+441234567891',
     'time' => '2025-10-31 18:30',
     'partySize' => 2,
     'customFields' => array(
@@ -752,7 +752,7 @@ curl -X POST https://app.resOS.com/api/bookings \
   -d '{
     "name": "John Smith",
     "email": "john@email.com",
-    "phone": "+447700900123",
+    "phone": "+441234567891",
     "time": "2025-10-31 18:30",
     "partySize": 2,
     "openingHourId": "evening_001"

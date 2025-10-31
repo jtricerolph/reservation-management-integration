@@ -98,9 +98,9 @@
 - **Current Mode**: Check in WordPress admin > Settings > Hotel Booking Table
 
 ### Database
-- **Host**: 172.17.0.1
+- **Host**: localhost
 - **Port**: 3306
-- **Database**: mysql
+- **Database**: database_name
 - **Tables**: Using wp_ prefix
 
 ---
