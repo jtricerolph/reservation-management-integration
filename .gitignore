@@ -1,0 +1,46 @@
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor Files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary Files
+*.tmp
+*.bak
+*.backup
+*.old
+*.orig
+
+# Logs
+*.log
+error_log
+
+# Development Files
+node_modules/
+vendor/
+composer.lock
+package-lock.json
+
+# Environment Files
+.env
+.env.*
+
+# Keep BACKUP directories
+!BACKUP/
+
+# Archive directories (cleanup archives)
+BACKUP/cleanup-archive-*/
+BACKUP/changelog-originals/
