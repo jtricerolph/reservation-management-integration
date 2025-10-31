@@ -44,3 +44,10 @@ package-lock.json
 # Archive directories (cleanup archives)
 BACKUP/cleanup-archive-*/
 BACKUP/changelog-originals/
+# Exclude all backup directories
+BACKUP/
+backup*/
+
+# Exclude backup files
+*.bak
+*.backup
