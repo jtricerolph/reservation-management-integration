@@ -2898,4 +2898,151 @@ document.addEventListener('DOMContentLoaded', function() {
             window.populateOpeningTimeSelector(openingHours);
         }
     }
+
+    // Handle booking deep linking via booking_id URL parameter
+    window.handleBookingDeepLink = function() {
+        var urlParams = new URLSearchParams(window.location.search);
+        var bookingId = urlParams.get('booking_id');
+
+        if (!bookingId) {
+            return; // No booking_id parameter, exit
+        }
+
+        console.log('Deep linking to booking ID:', bookingId);
+
+        // Fetch booking data from NewBook API
+        fetch(hotelBookingAjax.ajaxUrl + '?action=get_booking_by_id&booking_id=' + bookingId, {
+            method: 'GET',
+            credentials: 'same-origin'
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (!data.success) {
+                console.error('Failed to fetch booking:', data.data.message);
+                alert('Booking not found: ' + (data.data.message || 'Unknown error'));
+                return;
+            }
+
+            var bookingData = data.data;
+            console.log('Booking data:', bookingData);
+
+            if (bookingData.num_nights === 1) {
+                // Single night stay - auto load that date
+                var date = bookingData.nights[0];
+                window.loadDateAndScrollToBooking(date, bookingId);
+            } else if (bookingData.num_nights > 1) {
+                // Multiple nights - show date selection popup
+                window.showNightSelectionPopup(bookingData.nights, bookingId);
+            } else {
+                alert('No valid nights found for this booking');
+            }
+        })
+        .catch(function(error) {
+            console.error('Error fetching booking:', error);
+            alert('Error fetching booking data');
+        });
+    };
+
+    // Load a specific date and scroll to booking row
+    window.loadDateAndScrollToBooking = function(date, bookingId) {
+        // Update the date picker and reload the page
+        var url = new URL(window.location.href);
+        url.searchParams.set('date', date);
+
+        // Remove booking_id so we don't trigger deep link again
+        url.searchParams.delete('booking_id');
+
+        // Add scroll target
+        url.hash = 'booking-' + bookingId;
+
+        window.location.href = url.toString();
+    };
+
+    // Show popup for selecting which night to view (multi-night stays)
+    window.showNightSelectionPopup = function(nights, bookingId) {
+        // Create popup overlay
+        var overlay = document.createElement('div');
+        overlay.id = 'night-selection-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+
+        // Create popup content
+        var popup = document.createElement('div');
+        popup.style.cssText = 'background: white; padding: 30px; border-radius: 8px; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);';
+
+        var html = '<h2 style="margin-top: 0; color: #333;">Select Night to View</h2>';
+        html += '<p style="margin-bottom: 20px; color: #666;">This booking spans multiple nights. Please select which night you\'d like to view:</p>';
+        html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+        nights.forEach(function(night, index) {
+            var nightDate = new Date(night);
+            var formatted = nightDate.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit'
+            });
+            html += '<button class="night-select-btn" data-date="' + night + '" style="padding: 12px 20px; font-size: 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">';
+            html += 'Night ' + (index + 1) + ': ' + formatted;
+            html += '</button>';
+        });
+
+        html += '</div>';
+        html += '<button id="cancel-night-selection" style="margin-top: 20px; padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Cancel</button>';
+
+        popup.innerHTML = html;
+        overlay.appendChild(popup);
+        document.body.appendChild(overlay);
+
+        // Add hover effect to buttons
+        var style = document.createElement('style');
+        style.textContent = '.night-select-btn:hover { background: #5568d3 !important; }';
+        document.head.appendChild(style);
+
+        // Add click handlers
+        popup.querySelectorAll('.night-select-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var selectedDate = this.getAttribute('data-date');
+                document.body.removeChild(overlay);
+                window.loadDateAndScrollToBooking(selectedDate, bookingId);
+            });
+        });
+
+        document.getElementById('cancel-night-selection').addEventListener('click', function() {
+            document.body.removeChild(overlay);
+
+            // Remove booking_id from URL
+            var url = new URL(window.location.href);
+            url.searchParams.delete('booking_id');
+            window.history.replaceState({}, '', url.toString());
+        });
+    };
+
+    // Scroll to booking row if hash is present
+    if (window.location.hash) {
+        var hash = window.location.hash.substring(1); // Remove #
+        if (hash.startsWith('booking-')) {
+            setTimeout(function() {
+                var bookingId = hash.replace('booking-', '');
+                var row = document.querySelector('tr[data-booking-id="' + bookingId + '"]');
+
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // Highlight the row briefly
+                    row.style.transition = 'background-color 0.3s';
+                    row.style.backgroundColor = '#fff3cd';
+
+                    setTimeout(function() {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+                } else {
+                    console.warn('Booking row not found for ID:', bookingId);
+                }
+            }, 500); // Wait for table to render
+        }
+    }
+
+    // Initialize deep linking
+    window.handleBookingDeepLink();
 });

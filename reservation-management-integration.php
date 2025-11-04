@@ -49,6 +49,8 @@ class Hotel_Booking_Table {
         add_action('wp_ajax_nopriv_preview_resos_create', array($this, 'ajax_preview_resos_create'));
         add_action('wp_ajax_get_dietary_choices', array($this, 'ajax_get_dietary_choices'));
         add_action('wp_ajax_nopriv_get_dietary_choices', array($this, 'ajax_get_dietary_choices'));
+        add_action('wp_ajax_get_booking_by_id', array($this, 'ajax_get_booking_by_id'));
+        add_action('wp_ajax_nopriv_get_booking_by_id', array($this, 'ajax_get_booking_by_id'));
 
         // Prevent WordPress from encoding HTML entities in our shortcode output
         add_filter('no_texturize_shortcodes', array($this, 'prevent_texturize'));
@@ -612,7 +614,31 @@ class Hotel_Booking_Table {
         
         return $response['data'];
     }
-    
+
+    /**
+     * Get a single booking by ID from NewBook API
+     */
+    private function get_booking_by_id($booking_id) {
+        $data = array(
+            'booking_id' => intval($booking_id)
+        );
+
+        $response = $this->call_api('bookings_get', $data);
+
+        if (!$response) {
+            return false;
+        }
+
+        if (!isset($response['data'])) {
+            $error_msg = 'Booking get API response missing "data" field';
+            error_log('RMI: ' . $error_msg);
+            $this->add_error($error_msg);
+            return false;
+        }
+
+        return $response['data'];
+    }
+
     /**
      * Get rooms data from API
      */
@@ -2621,6 +2647,63 @@ class Hotel_Booking_Table {
     }
 
     /**
+     * AJAX handler to get a single booking by ID
+     */
+    public function ajax_get_booking_by_id() {
+        // Get booking_id from request
+        $booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+
+        if (empty($booking_id)) {
+            wp_send_json_error(array('message' => 'Booking ID is required'));
+            return;
+        }
+
+        // Fetch the booking from NewBook API
+        $booking = $this->get_booking_by_id($booking_id);
+
+        if (!$booking) {
+            wp_send_json_error(array('message' => 'Booking not found or API error'));
+            return;
+        }
+
+        // Extract arrival and departure dates
+        $arrival_date = '';
+        $departure_date = '';
+
+        if (isset($booking['booking_arrival'])) {
+            $arrival_date = substr($booking['booking_arrival'], 0, 10); // Get YYYY-MM-DD
+        }
+        if (isset($booking['booking_departure'])) {
+            $departure_date = substr($booking['booking_departure'], 0, 10); // Get YYYY-MM-DD
+        }
+
+        // Calculate the nights between dates
+        $nights = array();
+        if ($arrival_date && $departure_date) {
+            $start = new DateTime($arrival_date);
+            $end = new DateTime($departure_date);
+            $interval = $start->diff($end);
+            $num_nights = $interval->days;
+
+            for ($i = 0; $i < $num_nights; $i++) {
+                $date = clone $start;
+                $date->add(new DateInterval('P' . $i . 'D'));
+                $nights[] = $date->format('Y-m-d');
+            }
+        }
+
+        // Return booking data with nights array
+        wp_send_json_success(array(
+            'booking' => $booking,
+            'booking_id' => $booking_id,
+            'arrival_date' => $arrival_date,
+            'departure_date' => $departure_date,
+            'nights' => $nights,
+            'num_nights' => count($nights)
+        ));
+    }
+
+    /**
      * Normalize string for matching (lowercase, remove hyphens, apostrophes, spaces)
      */
     private function normalize_for_matching($string) {
@@ -3862,7 +3945,7 @@ class Hotel_Booking_Table {
                                         $guest_data_json = esc_attr(json_encode($guest_data, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP));
                                     }
                                     ?>
-                                    <tr data-room-id="<?php echo esc_attr($room_number); ?>">
+                                    <tr data-room-id="<?php echo esc_attr($room_number); ?>" data-booking-id="<?php echo esc_attr($tooltip_booking_id); ?>">
                                         <td>
                                             <div class="room-number"><?php echo esc_html($room_number); ?></div>
                                             <?php if ($room_category): ?>
@@ -4171,7 +4254,7 @@ class Hotel_Booking_Table {
                                                 $guest_data_json = esc_attr(json_encode($guest_data, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP));
                                             }
                                             ?>
-                                            <tr data-room-id="<?php echo esc_attr($room_number); ?>">
+                                            <tr data-room-id="<?php echo esc_attr($room_number); ?>" data-booking-id="<?php echo esc_attr($tooltip_booking_id); ?>">
                                                 <td>
                                                     <div class="room-number"><?php echo esc_html($room_number); ?></div>
                                                     <?php if ($room_category): ?>
