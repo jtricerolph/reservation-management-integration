@@ -2899,16 +2899,120 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Handle auto-action URL parameter (from Chrome extension deep links)
+    window.handleAutoAction = function() {
+        var urlParams = new URLSearchParams(window.location.search);
+        var autoAction = urlParams.get('auto-action');
+        var resosId = urlParams.get('resos_id');
+        var bookingId = urlParams.get('booking_id');
+        var date = urlParams.get('date');
+
+        if (!autoAction || !bookingId) {
+            return; // No auto-action or booking_id, exit
+        }
+
+        console.log('Handling auto-action:', autoAction);
+
+        // Wait a bit longer to ensure all elements are rendered
+        setTimeout(function() {
+            var bookingRow = document.querySelector('tr[data-booking-id="' + bookingId + '"]');
+            if (!bookingRow) {
+                console.warn('Booking row not found for auto-action');
+                return;
+            }
+
+            if (autoAction === 'match' && resosId) {
+                // Find the restaurant booking element with this resos_id within the booking row
+                var restaurantBookings = bookingRow.querySelectorAll('.restaurant-booking');
+                var targetBooking = null;
+
+                restaurantBookings.forEach(function(booking) {
+                    var tooltipBookingId = booking.getAttribute('data-tooltip-booking-id');
+                    if (tooltipBookingId === resosId) {
+                        targetBooking = booking;
+                    }
+                });
+
+                if (targetBooking) {
+                    // Get the unique-id and trigger the comparison row
+                    var uniqueId = targetBooking.getAttribute('data-unique-id');
+                    var roomNumber = targetBooking.getAttribute('data-room');
+                    var isConfirmed = targetBooking.classList.contains('confirmed-match');
+                    var matchType = isConfirmed ? 'primary' : 'suggested';
+
+                    console.log('Auto-opening comparison row:', uniqueId, matchType);
+
+                    // Trigger the comparison row
+                    if (targetBooking.classList.contains('expandable-match') || isConfirmed) {
+                        targetBooking.click();
+                    } else {
+                        // Fallback: call toggleComparisonRow directly
+                        window.toggleComparisonRow(uniqueId, roomNumber, matchType);
+                    }
+                } else {
+                    console.warn('Restaurant booking not found for resos_id:', resosId);
+                }
+
+            } else if (autoAction === 'create' && date) {
+                // Find the "Create Booking" button for this booking row
+                var createButton = bookingRow.querySelector('.btn-create-booking');
+
+                if (createButton) {
+                    console.log('Auto-opening create booking form');
+
+                    // Trigger the create booking button
+                    createButton.click();
+                } else {
+                    console.warn('Create booking button not found');
+                }
+            }
+
+            // Clean up URL parameters after handling (optional)
+            var url = new URL(window.location.href);
+            url.searchParams.delete('auto-action');
+            url.searchParams.delete('resos_id');
+            window.history.replaceState({}, '', url.toString());
+
+        }, 1000); // Wait 1 second for all elements to render
+    };
+
     // Handle booking deep linking via booking_id URL parameter
     window.handleBookingDeepLink = function() {
         var urlParams = new URLSearchParams(window.location.search);
         var bookingId = urlParams.get('booking_id');
+        var date = urlParams.get('date');
 
         if (!bookingId) {
             return; // No booking_id parameter, exit
         }
 
         console.log('Deep linking to booking ID:', bookingId);
+
+        // If date is already provided in URL (e.g., from Chrome extension),
+        // just scroll to the booking without fetching
+        if (date) {
+            console.log('Date already provided:', date);
+            setTimeout(function() {
+                var row = document.querySelector('tr[data-booking-id="' + bookingId + '"]');
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // Highlight the row briefly
+                    row.style.transition = 'background-color 0.3s';
+                    row.style.backgroundColor = '#fff3cd';
+
+                    setTimeout(function() {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+
+                    // Handle auto-action after scrolling
+                    window.handleAutoAction();
+                } else {
+                    console.warn('Booking row not found for ID:', bookingId);
+                }
+            }, 500);
+            return;
+        }
 
         // Fetch booking data from NewBook API
         fetch(hotelBookingAjax.ajaxUrl + '?action=get_booking_by_id&booking_id=' + bookingId, {
@@ -2949,10 +3053,20 @@ document.addEventListener('DOMContentLoaded', function() {
     window.loadDateAndScrollToBooking = function(date, bookingId) {
         // Update the date picker and reload the page
         var url = new URL(window.location.href);
+        var currentParams = new URLSearchParams(window.location.search);
+
         url.searchParams.set('date', date);
 
         // Remove booking_id so we don't trigger deep link again
         url.searchParams.delete('booking_id');
+
+        // Preserve auto-action and resos_id parameters if they exist
+        if (currentParams.has('auto-action')) {
+            url.searchParams.set('auto-action', currentParams.get('auto-action'));
+        }
+        if (currentParams.has('resos_id')) {
+            url.searchParams.set('resos_id', currentParams.get('resos_id'));
+        }
 
         // Add scroll target
         url.hash = 'booking-' + bookingId;
@@ -3036,6 +3150,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(function() {
                         row.style.backgroundColor = '';
                     }, 2000);
+
+                    // Handle auto-action after scrolling
+                    window.handleAutoAction();
                 } else {
                     console.warn('Booking row not found for ID:', bookingId);
                 }
