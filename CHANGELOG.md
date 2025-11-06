@@ -4,6 +4,60 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.1] - 2025-11-06
+
+### Bug Fixes
+
+#### Fixed Critical Duplicate Booking Submission Bug
+**Issue**: Create booking button could be clicked multiple times in rapid succession (within ~0.5-2 seconds), creating duplicate bookings in Resos.
+
+**Root Cause**:
+- No button disabling during API request (JavaScript)
+- No in-flight request tracking flag (JavaScript)
+- No server-side duplicate detection (PHP)
+- No user feedback on errors
+
+**Fix Implemented - Multi-Layer Protection**:
+
+**Layer 1: JavaScript Client-Side Protection** ([staying-today.js](assets/staying-today.js))
+- Added global in-flight request flag `window.createBookingInProgress`
+- Early return if request already in progress (line 800)
+- Button disabled immediately when clicked with visual feedback "Creating..." (lines 917-923)
+- Button stays disabled on success (page reloads) (lines 982-985)
+- Button re-enabled on errors with user-friendly alert dialogs (lines 989-1004, 1007-1020)
+- Same protection applied to preview mode (testing/sandbox) (lines 1028-1033, 1105-1136)
+- Network errors now show alerts instead of silent console logging
+
+**Layer 2: PHP Server-Side Protection** ([reservation-management-integration.php](reservation-management-integration.php))
+- WordPress transient-based duplicate detection (lines 2016-2036)
+- Unique key generated from: `md5(guest_name|date|time|email)`
+- Checks for duplicate submission within 5-second window
+- Returns user-friendly error if duplicate detected
+- Transient extended to 10 seconds after successful booking (line 2286)
+- Detailed logging: "RMI: Duplicate booking submission blocked - [guest] on [date] at [time]"
+
+**User Experience Improvements**:
+- Button shows loading state: "Creating..." with clock icon
+- Success state before reload: "Created!" with checkmark icon
+- Clear error messages displayed to user (not just console)
+- Network errors handled gracefully with retry option
+
+**Testing Recommendations**:
+1. Test rapid double-click (should only create one booking)
+2. Test slow network conditions (button should stay disabled)
+3. Test error scenarios (button should re-enable with alert)
+4. Test all three API modes (production/testing/sandbox)
+5. Verify transient cleanup after 10 seconds
+6. Check debug.log for duplicate blocking messages
+
+**Files Modified**:
+- `assets/staying-today.js` (lines 798-1141 modified)
+- `reservation-management-integration.php` (lines 2016-2036, 2285-2286 added)
+
+**Version Incremented**: 2.0.0 → 2.0.1
+
+---
+
 ## [2.0.0] - 2025-10-31
 
 ### Major Plugin Restructuring

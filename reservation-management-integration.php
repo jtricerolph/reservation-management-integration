@@ -3,7 +3,7 @@
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
  * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -18,8 +18,8 @@ if (!defined('ABSPATH')) {
 
 class Hotel_Booking_Table {
 
-    const VERSION = '2.0.0';
-    const JS_VERSION = '2.0.0';
+    const VERSION = '2.0.1';
+    const JS_VERSION = '2.0.1';
 
     private $errors = array();
     private $api_base_url = 'https://api.newbook.cloud/rest/';
@@ -2013,6 +2013,28 @@ class Hotel_Booking_Table {
             return;
         }
 
+        // Duplicate submission prevention using WordPress transients
+        // Create a unique key based on guest name, date, and time
+        $duplicate_key = 'rmi_create_booking_' . md5(
+            strtolower(trim($guest_name)) . '|' .
+            $date . '|' .
+            $time . '|' .
+            strtolower(trim($guest_email))
+        );
+
+        // Check if this exact booking was just submitted (within last 5 seconds)
+        if (get_transient($duplicate_key)) {
+            error_log('RMI: Duplicate booking submission blocked - ' . $guest_name . ' on ' . $date . ' at ' . $time);
+            wp_send_json_error(array(
+                'message' => 'Duplicate submission detected. This booking was just created. Please refresh the page to see the updated bookings.'
+            ));
+            return;
+        }
+
+        // Set transient to block duplicates for 5 seconds
+        // This will be extended to 10 seconds if the booking succeeds
+        set_transient($duplicate_key, true, 5);
+
         // Format phone for Resos API (requires + and country code)
         $guest_phone = $this->format_phone_for_resos($guest_phone);
 
@@ -2259,6 +2281,9 @@ class Hotel_Booking_Table {
         error_log('Booking created for: ' . $guest_name);
         error_log('Date/Time: ' . $date . ' ' . $time);
         error_log('==============================');
+
+        // Extend the duplicate prevention transient to 10 seconds after successful creation
+        set_transient($duplicate_key, true, 10);
 
         // If there's a booking note, add it via separate endpoint
         if (!empty($booking_note)) {

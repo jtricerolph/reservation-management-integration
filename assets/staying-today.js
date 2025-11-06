@@ -796,6 +796,12 @@ window.selectTimeSlot = function(time, isAvailable) {
 
 // Create booking with the selected time
 window.createBookingWithSelectedTime = function(roomNumber) {
+    // Prevent duplicate submissions - check if request is already in progress
+    if (window.createBookingInProgress) {
+        console.log('Create booking already in progress, ignoring duplicate click');
+        return;
+    }
+
     var time = window.selectedTime;
     var isAvailable = window.selectedTimeIsAvailable;
 
@@ -902,8 +908,19 @@ window.createBookingWithSelectedTime = function(roomNumber) {
                            (openingHourName ? ' [' + openingHourName + ']' : '') +
                            (!isAvailable ? ' [OVERRIDE UNAVAILABLE TIME]' : '');
 
+    // Get the create booking button reference
+    var createButton = document.getElementById('btn-create-booking-' + roomNumber);
+
     // Define the actual API call function
     var executeApiCall = function() {
+        // Set in-flight flag to prevent duplicate submissions
+        window.createBookingInProgress = true;
+
+        // Disable button and update UI
+        if (createButton) {
+            createButton.disabled = true;
+            createButton.innerHTML = '<span class="material-symbols-outlined">schedule</span> Creating...';
+        }
         console.log('Create Booking - Making API call...');
         console.log('Room Number:', roomNumber);
         console.log('Request Body:', resosRequestBody);
@@ -962,14 +979,43 @@ window.createBookingWithSelectedTime = function(roomNumber) {
         })
         .then(function(data) {
             if (data.success) {
+                // Keep button disabled and show success state
+                if (createButton) {
+                    createButton.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Created!';
+                }
                 // Reload the page to show updated data
                 location.reload();
             } else {
+                // Reset in-flight flag on error
+                window.createBookingInProgress = false;
+
+                // Re-enable button and restore original text
+                if (createButton) {
+                    createButton.disabled = false;
+                    createButton.innerHTML = '<span class="material-symbols-outlined">add_circle</span> Create Booking';
+                }
+
+                // Show user-friendly error message
+                var errorMessage = data.data && data.data.message ? data.data.message : 'Unknown error occurred';
+                alert('Failed to create booking:\n\n' + errorMessage + '\n\nPlease try again or contact support if the problem persists.');
+
                 console.error('Error:', data.data);
                 console.error('Failed to create booking');
             }
         })
         .catch(function(error) {
+            // Reset in-flight flag on network error
+            window.createBookingInProgress = false;
+
+            // Re-enable button and restore original text
+            if (createButton) {
+                createButton.disabled = false;
+                createButton.innerHTML = '<span class="material-symbols-outlined">add_circle</span> Create Booking';
+            }
+
+            // Show user-friendly error message
+            alert('Network error: Failed to create booking.\n\nPlease check your connection and try again.');
+
             console.error('Request failed:', error);
         });
     };
@@ -979,6 +1025,13 @@ window.createBookingWithSelectedTime = function(roomNumber) {
 
     // Handle different API modes
     if (apiMode === 'sandbox' || apiMode === 'testing') {
+        // Set in-flight flag and disable button for preview mode too
+        window.createBookingInProgress = true;
+        if (createButton) {
+            createButton.disabled = true;
+            createButton.innerHTML = '<span class="material-symbols-outlined">schedule</span> Loading Preview...';
+        }
+
         // For sandbox/testing modes, fetch the preview data first
         var previewFormData = new FormData();
         previewFormData.append('action', 'preview_resos_create');
@@ -1049,11 +1102,36 @@ window.createBookingWithSelectedTime = function(roomNumber) {
 
                 window.showSandboxPopup(popupConfig);
             } else {
+                // Reset in-flight flag on preview error
+                window.createBookingInProgress = false;
+
+                // Re-enable button and restore original text
+                if (createButton) {
+                    createButton.disabled = false;
+                    createButton.innerHTML = '<span class="material-symbols-outlined">add_circle</span> Create Booking';
+                }
+
+                // Show user-friendly error message
+                var errorMessage = data.data && data.data.message ? data.data.message : 'Unknown error';
+                alert('Failed to generate preview:\n\n' + errorMessage + '\n\nPlease try again or contact support if the problem persists.');
+
                 console.error('Preview failed:', data.data);
                 console.error('Failed to generate preview: ' + (data.data.message || 'Unknown error'));
             }
         })
         .catch(function(error) {
+            // Reset in-flight flag on network error
+            window.createBookingInProgress = false;
+
+            // Re-enable button and restore original text
+            if (createButton) {
+                createButton.disabled = false;
+                createButton.innerHTML = '<span class="material-symbols-outlined">add_circle</span> Create Booking';
+            }
+
+            // Show user-friendly error message
+            alert('Network error: Failed to load preview.\n\nPlease check your connection and try again.');
+
             console.error('Preview request failed:', error);
         });
     } else {
