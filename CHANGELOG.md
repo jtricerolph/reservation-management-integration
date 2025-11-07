@@ -4,6 +4,140 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.4] - 2025-11-07
+
+### New Features
+
+#### "View in Resos" Quick Access Buttons
+**Feature**: Added blue "View in Resos" buttons throughout the interface for quick access to restaurant booking admin pages.
+
+**Problem Solved**:
+- Staff needed to manually search for bookings in Resos admin dashboard
+- Time-consuming workflow when verifying or editing restaurant bookings
+- Multiple clicks required to access booking details
+
+**Button Locations**:
+1. **Action Cell Buttons** (alongside existing buttons):
+   - Next to "Check Updates" for confirmed matches with suggested updates
+   - Next to "View Details" for confirmed matches without updates
+   - Next to "Check Match" for suggested matches
+   - Available in both individual and grouped room sections
+
+2. **Inline Match Links** (within restaurant booking display):
+   - Small "View" link with eye icon after each match indicator
+   - Appears for both confirmed and suggested matches
+   - Present in both individual and grouped room sections
+
+3. **Comparison Section Buttons** (in match comparison tooltip):
+   - Blue button in comparison actions row
+   - Available for all match types (suggested, confirmed, updates)
+
+**How It Works**:
+1. Configure Resos Admin URL in Settings > Hotel Booking Table
+2. Default: `https://admin.resos.com/bookings`
+3. Buttons open Resos booking in new tab: `{URL}/{booking_id}`
+4. Instant access to full booking details in Resos admin
+
+**Configuration**:
+- Settings field: "Resos Admin URL"
+- Location: WordPress Admin > Settings > Hotel Booking Table
+- Default value: `https://admin.resos.com/bookings`
+- Passed to JavaScript via `wp_localize_script` as `hotelBookingAjax.resosAdminUrl`
+
+#### "Exclude Match" One-Click Exclusion
+**Feature**: Added red "Exclude Match" button in comparison section for one-click match exclusions using the "NOT-#" pattern.
+
+**Problem Solved**:
+- Manual process required opening Resos admin and adding notes
+- Staff needed to remember the "NOT-#12345" format
+- Multiple steps to exclude an incorrect match
+
+**How It Works**:
+1. Click "Check Match" on a suggested match to open comparison
+2. Review match details and confirm it's incorrect
+3. Click red "Exclude Match" button
+4. Confirm action in dialog box
+5. System automatically adds "NOT-#12345" note to Resos booking
+6. Page reloads to reflect changes
+
+**Button Behavior**:
+- **Only appears** for suggested matches (not confirmed matches)
+- **Requires both** Resos booking ID and hotel booking ID
+- **Confirmation dialog** explains what will happen
+- **Automatic reload** after successful exclusion
+
+**Technical Implementation**:
+
+**Frontend (JavaScript)**:
+- `excludeMatch(resosBookingId, hotelBookingId, uniqueId)` function
+- AJAX call to `exclude_resos_match` action
+- Confirmation prompt before execution
+- Success message and page reload
+
+**Backend (PHP)**:
+- `ajax_exclude_resos_match()` handler
+- Fetches current Resos booking
+- Appends new note to `restaurantNotes` array
+- Updates booking via Resos API PUT request
+- Returns success/error with descriptive messages
+
+**Error Handling**:
+- Validates Resos API key exists
+- Checks for valid booking IDs
+- Handles API failures gracefully
+- Logs all operations to debug.log with "RMI: Exclude Match" prefix
+
+**User Workflow**:
+1. View suggested match in booking table
+2. Click "Check Match" to open comparison
+3. Verify match is incorrect
+4. Click "Exclude Match" button
+5. Confirm in dialog
+6. Page reloads - match no longer appears
+
+**CSS Styling**:
+- `.btn-view-resos`: Blue button (#2563eb) with eye icon
+- `.btn-exclude-match`: Red button (#dc3545) with X icon
+- Consistent with existing button styles
+- Hover effects and active states
+
+**Files Modified**:
+- `reservation-management-integration.php`:
+  - Lines 54-55: Added AJAX action registration
+  - Lines 90, 156-162, 264-268: Settings registration and field
+  - Lines 446: Added Resos URL to wp_localize_script
+  - Lines 2752-2882: AJAX handler `ajax_exclude_resos_match()`
+  - Lines 4158-4159, 4173-4195: View in Resos buttons (individual rooms)
+  - Lines 4499-4500, 4514-4536: View in Resos buttons (grouped rooms)
+  - Lines 4140-4142: Inline View in Resos link (individual rooms)
+  - Lines 4484-4486: Inline View in Resos link (grouped rooms)
+
+- `assets/staying-today.js`:
+  - Lines 1609-1636: View in Resos and Exclude Match buttons in comparison section
+  - Lines 797-836: `excludeMatch()` function
+
+- `assets/style.css`:
+  - Lines 463-464: Added button classes to base button styles
+  - Lines 566-584: View in Resos and Exclude Match button styles
+  - Lines 590-591: Added to active state styles
+
+**Version Incremented**: 2.0.3 → 2.0.4
+
+**Advantages**:
+- **Time Savings**: One-click access to Resos admin
+- **Error Reduction**: Automatic note formatting
+- **Improved UX**: Streamlined workflow for common tasks
+- **Consistency**: Uses existing "NOT-#" exclusion system from v2.0.3
+- **Flexibility**: Both quick buttons and manual process available
+
+**Integration with Existing Features**:
+- Works seamlessly with "NOT-#" exclusion pattern (v2.0.3)
+- Respects existing match priority levels
+- Maintains all logging and debugging capabilities
+- Compatible with package booking alerts (v2.0.2)
+
+---
+
 ## [2.0.3] - 2025-11-07
 
 ### New Features

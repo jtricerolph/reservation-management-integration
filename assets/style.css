@@ -456,10 +456,26 @@ html, body {
     text-align: center;
 }
 
+/* Action button groups - align with restaurant booking blocks */
+.action-button-group {
+    margin-bottom: 8px;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.action-button-group.last-group {
+    margin-bottom: 0;
+}
+
 .btn-create-booking,
 .btn-check-match,
 .btn-check-updates,
-.btn-view-details {
+.btn-view-details,
+.btn-view-resos,
+.btn-exclude-match {
     padding: 8px 16px;
     min-width: 140px;
     color: white;
@@ -473,6 +489,7 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 6px;
+    margin: 4px;
 }
 
 .btn-create-booking {
@@ -561,10 +578,32 @@ html, body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
+.btn-view-resos {
+    background-color: #2563eb;
+}
+
+.btn-view-resos:hover {
+    background-color: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-exclude-match {
+    background-color: #dc3545;
+}
+
+.btn-exclude-match:hover {
+    background-color: #c82333;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
 .btn-create-booking:active,
 .btn-check-match:active,
 .btn-check-updates:active,
-.btn-view-details:active {
+.btn-view-details:active,
+.btn-view-resos:active,
+.btn-exclude-match:active {
     transform: translateY(0);
 }
 
@@ -1740,7 +1779,9 @@ html, body {
 }
 
 .btn-close-comparison,
-.btn-confirm-match {
+.btn-confirm-match,
+.comparison-actions-buttons .btn-view-resos,
+.comparison-actions-buttons .btn-exclude-match {
     padding: 8px 20px;
     color: white;
     border: none;
@@ -1753,6 +1794,13 @@ html, body {
     align-items: center;
     gap: 6px;
     white-space: nowrap;
+    min-width: auto;
+}
+
+/* Override general button margins for comparison section buttons */
+.comparison-actions-buttons .btn-view-resos,
+.comparison-actions-buttons .btn-exclude-match {
+    margin: 0;
 }
 
 .btn-close-comparison {
@@ -2754,4 +2802,129 @@ html, body {
     .sandbox-endpoint {
         font-size: 12px;
     }
+}
+
+/* Custom Confirmation Modal */
+.custom-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.custom-modal {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.custom-modal-icon {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.custom-modal-icon .material-symbols-outlined {
+    font-size: 64px;
+    color: #dc3545;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.custom-modal-message {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #495057;
+    text-align: center;
+    margin-bottom: 30px;
+    white-space: pre-line;
+}
+
+.custom-modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.custom-modal-btn {
+    padding: 12px 28px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.custom-modal-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.custom-modal-btn-cancel {
+    background-color: #6c757d;
+    color: white;
+}
+
+.custom-modal-btn-cancel:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.custom-modal-btn-confirm {
+    background-color: #dc3545;
+    color: white;
+}
+
+.custom-modal-btn-confirm:hover {
+    background-color: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.custom-modal-btn:active {
+    transform: translateY(0);
 }

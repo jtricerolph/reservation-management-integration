@@ -794,6 +794,100 @@ window.selectTimeSlot = function(time, isAvailable) {
     }
 };
 
+// Custom confirmation modal
+window.showConfirmModal = function(message, onConfirm) {
+    // Create modal overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+
+    // Create modal content
+    var modal = document.createElement('div');
+    modal.className = 'custom-modal';
+
+    var icon = document.createElement('div');
+    icon.className = 'custom-modal-icon';
+    icon.innerHTML = '<span class="material-symbols-outlined">warning</span>';
+
+    var messageEl = document.createElement('div');
+    messageEl.className = 'custom-modal-message';
+    messageEl.textContent = message;
+
+    var buttons = document.createElement('div');
+    buttons.className = 'custom-modal-buttons';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'custom-modal-btn custom-modal-btn-cancel';
+    cancelBtn.innerHTML = '<span class="material-symbols-outlined">close</span> Cancel';
+    cancelBtn.onclick = function() {
+        document.body.removeChild(overlay);
+    };
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.className = 'custom-modal-btn custom-modal-btn-confirm';
+    confirmBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Exclude Match';
+    confirmBtn.onclick = function() {
+        document.body.removeChild(overlay);
+        onConfirm();
+    };
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(confirmBtn);
+
+    modal.appendChild(icon);
+    modal.appendChild(messageEl);
+    modal.appendChild(buttons);
+    overlay.appendChild(modal);
+
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.onclick = function(e) {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    };
+};
+
+// Exclude a suggested match by adding NOT-# note to Resos booking
+window.excludeMatch = function(resosBookingId, hotelBookingId, uniqueId) {
+    var message = 'Are you sure you want to exclude this match?\n\nThis will add a "NOT-#' + hotelBookingId + '" note to the Resos booking to prevent future matching against this booking.';
+
+    window.showConfirmModal(message, function() {
+        // Prepare form data for WordPress AJAX
+        var formData = new FormData();
+        formData.append('action', 'exclude_resos_match');
+        formData.append('nonce', hotelBookingAjax.nonce);
+        formData.append('resos_booking_id', resosBookingId);
+        formData.append('hotel_booking_id', hotelBookingId);
+
+        console.log('Excluding match: Resos booking ' + resosBookingId + ' from hotel booking #' + hotelBookingId);
+
+        // Make AJAX call to WordPress
+        fetch(hotelBookingAjax.ajaxUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.success) {
+                console.log('Match excluded successfully');
+                alert(data.data.message);
+                // Reload the page to show updated data
+                location.reload();
+            } else {
+                console.error('Error:', data.data);
+                alert('Failed to exclude match: ' + (data.data.message || 'Unknown error'));
+            }
+        })
+        .catch(function(error) {
+            console.error('Request failed:', error);
+            alert('Network error while excluding match. Please try again.');
+        });
+    });
+};
+
 // Create booking with the selected time
 window.createBookingWithSelectedTime = function(roomNumber) {
     // Prevent duplicate submissions - check if request is already in progress
@@ -1606,10 +1700,27 @@ window.buildComparisonRow = function(data, uniqueId, roomId, matchType) {
         '<span class="material-symbols-outlined">close</span> Close' +
         '</button>';
 
-    // Only show Update button if there are suggested updates
+    // Add Exclude Match button (only for suggested matches, not confirmed) - FIRST after Close
+    var isConfirmedMatch = data.matches && data.matches.booking_ref;
+    if (!isConfirmedMatch && data.resos && data.resos.id && data.hotel && data.hotel.booking_id) {
+        html += '<button class="btn-exclude-match" onclick="excludeMatch(\'' + data.resos.id + '\', \'' + data.hotel.booking_id + '\', \'' + uniqueId + '\')">' +
+            '<span class="material-symbols-outlined">close</span> Exclude Match' +
+            '</button>';
+    }
+
+    // Add View in Resos button (for all matches) - SECOND after Exclude
+    if (data.resos && data.resos.id && data.resos.restaurant_id) {
+        var currentDate = (typeof hotelBookingAjax !== 'undefined' && hotelBookingAjax.currentDate) ?
+            hotelBookingAjax.currentDate : '';
+        var resosUrl = 'https://app.resos.com/' + data.resos.restaurant_id + '/bookings/timetable/' + currentDate + '/' + data.resos.id;
+        html += '<button class="btn-view-resos" onclick="window.open(\'' + resosUrl + '\', \'_blank\')">' +
+            '<span class="material-symbols-outlined">visibility</span> View in Resos' +
+            '</button>';
+    }
+
+    // Only show Update button if there are suggested updates - LAST
     var hasSuggestions = suggestions && Object.keys(suggestions).length > 0;
     if (hasSuggestions) {
-        var isConfirmedMatch = data.matches && data.matches.booking_ref;
         var buttonLabel = isConfirmedMatch ? 'Update Selected' : 'Update Selected & Match';
         var buttonClass = isConfirmedMatch ? 'btn-confirm-match btn-update-confirmed' : 'btn-confirm-match';
 

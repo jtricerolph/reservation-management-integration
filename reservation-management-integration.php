@@ -3,7 +3,7 @@
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
  * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.3
+ * Version: 2.0.4
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -51,6 +51,8 @@ class Hotel_Booking_Table {
         add_action('wp_ajax_nopriv_get_dietary_choices', array($this, 'ajax_get_dietary_choices'));
         add_action('wp_ajax_get_booking_by_id', array($this, 'ajax_get_booking_by_id'));
         add_action('wp_ajax_nopriv_get_booking_by_id', array($this, 'ajax_get_booking_by_id'));
+        add_action('wp_ajax_exclude_resos_match', array($this, 'ajax_exclude_resos_match'));
+        add_action('wp_ajax_nopriv_exclude_resos_match', array($this, 'ajax_exclude_resos_match'));
 
         // Prevent WordPress from encoding HTML entities in our shortcode output
         add_filter('no_texturize_shortcodes', array($this, 'prevent_texturize'));
@@ -87,6 +89,7 @@ class Hotel_Booking_Table {
         register_setting('hotel_booking_table_settings', 'hotel_booking_api_region');
         register_setting('hotel_booking_table_settings', 'hotel_booking_default_hotel_id');
         register_setting('hotel_booking_table_settings', 'hotel_booking_resos_api_key');
+        register_setting('hotel_booking_table_settings', 'hotel_booking_resos_admin_url');
         register_setting('hotel_booking_table_settings', 'hotel_booking_package_inventory_name');
         register_setting('hotel_booking_table_settings', 'hotel_booking_mode');
         
@@ -148,6 +151,14 @@ class Hotel_Booking_Table {
             'hotel_booking_resos_api_key',
             'Resos API Key',
             array($this, 'resos_api_key_field_callback'),
+            'hotel-booking-table',
+            'hotel_booking_resos_section'
+        );
+
+        add_settings_field(
+            'hotel_booking_resos_admin_url',
+            'Resos Admin URL',
+            array($this, 'resos_admin_url_field_callback'),
             'hotel-booking-table',
             'hotel_booking_resos_section'
         );
@@ -247,6 +258,15 @@ class Hotel_Booking_Table {
         $value = get_option('hotel_booking_resos_api_key', '');
         echo '<input type="text" name="hotel_booking_resos_api_key" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">Your Resos restaurant booking system API key (optional)</p>';
+    }
+
+    /**
+     * Resos Admin URL field callback
+     */
+    public function resos_admin_url_field_callback() {
+        $value = get_option('hotel_booking_resos_admin_url', 'https://admin.resos.com/bookings');
+        echo '<input type="text" name="hotel_booking_resos_admin_url" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">Base URL for Resos admin interface (e.g., https://admin.resos.com/bookings)</p>';
     }
 
     /**
@@ -414,7 +434,7 @@ class Hotel_Booking_Table {
             // Get API mode setting (production, testing, sandbox)
             $api_mode = get_option('hotel_booking_mode', 'production');
 
-            // Pass AJAX URL, opening hours, special events, and API mode to JavaScript
+            // Pass AJAX URL, opening hours, special events, API mode, and Resos admin URL to JavaScript
             wp_localize_script(
                 'hotel-booking-table-scripts',
                 'hotelBookingAjax',
@@ -424,7 +444,8 @@ class Hotel_Booking_Table {
                     'currentDate' => $input_date,
                     'openingHours' => $opening_hours,
                     'specialEvents' => $special_events,
-                    'apiMode' => $api_mode // 'production', 'testing', or 'sandbox'
+                    'apiMode' => $api_mode, // 'production', 'testing', or 'sandbox'
+                    'resosAdminUrl' => get_option('hotel_booking_resos_admin_url', 'https://admin.resos.com/bookings')
                 )
             );
         }
@@ -2729,6 +2750,90 @@ class Hotel_Booking_Table {
     }
 
     /**
+     * AJAX handler to exclude a suggested match by adding NOT-# note to Resos booking
+     */
+    public function ajax_exclude_resos_match() {
+        // Verify nonce for security
+        check_ajax_referer('hotel-booking-nonce', 'nonce');
+
+        // Get parameters from POST
+        $resos_booking_id = isset($_POST['resos_booking_id']) ? sanitize_text_field($_POST['resos_booking_id']) : '';
+        $hotel_booking_id = isset($_POST['hotel_booking_id']) ? sanitize_text_field($_POST['hotel_booking_id']) : '';
+
+        // Validate parameters
+        if (empty($resos_booking_id)) {
+            wp_send_json_error(array('message' => 'Resos booking ID is required'));
+            return;
+        }
+
+        if (empty($hotel_booking_id)) {
+            wp_send_json_error(array('message' => 'Hotel booking ID is required'));
+            return;
+        }
+
+        // Get Resos API key
+        $resos_api_key = get_option('hotel_booking_resos_api_key');
+        if (empty($resos_api_key)) {
+            wp_send_json_error(array('message' => 'Resos API key not configured'));
+            return;
+        }
+
+        // Use the dedicated restaurant note endpoint
+        $note_url = 'https://api.resos.com/v1/bookings/' . urlencode($resos_booking_id) . '/restaurantNote';
+
+        // Prepare the note request body
+        $note_text = 'NOT-#' . $hotel_booking_id;
+        $request_body = json_encode(array('text' => $note_text));
+
+        $post_args = array(
+            'method' => 'POST',
+            'timeout' => 30,
+            'headers' => array(
+                'Authorization' => 'Basic ' . base64_encode($resos_api_key . ':'),
+                'Content-Type' => 'application/json'
+            ),
+            'body' => $request_body
+        );
+
+        error_log('RMI: Exclude Match - Adding note "' . $note_text . '" to Resos booking ' . $resos_booking_id);
+
+        // Make POST request to add restaurant note
+        $response = wp_remote_post($note_url, $post_args);
+
+        if (is_wp_error($response)) {
+            $error_msg = 'Failed to add note to Resos booking: ' . $response->get_error_message();
+            error_log('RMI: Exclude Match - ' . $error_msg);
+            wp_send_json_error(array('message' => $error_msg));
+            return;
+        }
+
+        $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+
+        // Note endpoint typically returns 201 Created for successful POST
+        if ($response_code !== 200 && $response_code !== 201) {
+            $error_msg = 'Failed to add note to Resos booking. Status: ' . $response_code;
+            error_log('RMI: Exclude Match - ' . $error_msg . ' - Response: ' . $response_body);
+            wp_send_json_error(array(
+                'message' => $error_msg,
+                'response_code' => $response_code,
+                'response_body' => $response_body
+            ));
+            return;
+        }
+
+        // Success!
+        error_log('RMI: Exclude Match SUCCESS - Added NOT-#' . $hotel_booking_id . ' to Resos booking ' . $resos_booking_id);
+
+        wp_send_json_success(array(
+            'message' => 'Match excluded successfully. Page will reload to reflect changes.',
+            'resos_booking_id' => $resos_booking_id,
+            'hotel_booking_id' => $hotel_booking_id,
+            'exclusion_note' => 'NOT-#' . $hotel_booking_id
+        ));
+    }
+
+    /**
      * Normalize string for matching (lowercase, remove hyphens, apostrophes, spaces)
      */
     private function normalize_for_matching($string) {
@@ -2939,6 +3044,7 @@ class Hotel_Booking_Table {
         
         // Extract Resos data
         $resos_booking_id = isset($resos_booking['_id']) ? $resos_booking['_id'] : (isset($resos_booking['id']) ? $resos_booking['id'] : '');
+        $resos_restaurant_id = isset($resos_booking['restaurantId']) ? $resos_booking['restaurantId'] : '';
         $resos_guest_name = isset($resos_booking['guest']['name']) ? trim($resos_booking['guest']['name']) : '';
         $resos_phone = isset($resos_booking['guest']['phone']) ? trim($resos_booking['guest']['phone']) : '';
         $resos_email = isset($resos_booking['guest']['email']) ? trim($resos_booking['guest']['email']) : '';
@@ -3102,6 +3208,7 @@ class Hotel_Booking_Table {
             ),
             'resos' => array(
                 'id' => $resos_booking_id,
+                'restaurant_id' => $resos_restaurant_id,
                 'name' => $resos_guest_name,
                 'phone' => $resos_phone,
                 'email' => $resos_email,
@@ -4132,31 +4239,41 @@ class Hotel_Booking_Table {
                                             $has_matches = isset($matched_restaurant_bookings[$room_number]) && !empty($matched_restaurant_bookings[$room_number]);
 
                                             if ($has_matches):
-                                                $first_match = $matched_restaurant_bookings[$room_number][0];
-                                                $is_confirmed_match = $first_match['match_info']['is_primary'];
-                                                $match_unique_id = 'rest-' . $room_number . '-0';
+                                                // Loop through ALL matches and show buttons for each
+                                                foreach ($matched_restaurant_bookings[$room_number] as $match_index => $match_data):
+                                                    $is_confirmed_match = $match_data['match_info']['is_primary'];
+                                                    $match_unique_id = 'rest-' . $room_number . '-' . $match_index;
 
-                                                // Check if there are suggested updates for confirmed matches
-                                                $has_updates = false;
-                                                if ($is_confirmed_match && isset($first_match['hotel_booking']) && isset($first_match['resos_booking'])) {
-                                                    $comp_check = $this->prepare_comparison_data($first_match['hotel_booking'], $first_match['resos_booking'], $input_date);
-                                                    $has_updates = !empty($comp_check['suggested_updates']);
-                                                }
+                                                    // Get Resos booking ID and restaurant ID for View in Resos button
+                                                    $resos_booking_id = $match_data['resos_booking']['_id'] ?? $match_data['resos_booking']['id'] ?? '';
+                                                    $resos_restaurant_id = $match_data['resos_booking']['restaurantId'] ?? '';
 
-                                                if ($is_confirmed_match && $has_updates):
-                                            ?>
-                                                <button class="btn-check-updates" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'updates')">
-                                                    <span class="material-symbols-outlined">update</span> Check Updates
-                                                </button>
-                                            <?php elseif ($is_confirmed_match && !$has_updates): ?>
-                                                <button class="btn-view-details" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'confirmed')">
-                                                    <span class="material-symbols-outlined">visibility</span> View Details
-                                                </button>
-                                            <?php elseif (!$is_confirmed_match): ?>
-                                                <button class="btn-check-match" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'suggested')">
-                                                    <span class="material-symbols-outlined">search</span> Check Match
-                                                </button>
-                                            <?php endif; ?>
+                                                    // Check if there are suggested updates for confirmed matches
+                                                    $has_updates = false;
+                                                    if ($is_confirmed_match && isset($match_data['hotel_booking']) && isset($match_data['resos_booking'])) {
+                                                        $comp_check = $this->prepare_comparison_data($match_data['hotel_booking'], $match_data['resos_booking'], $input_date);
+                                                        $has_updates = !empty($comp_check['suggested_updates']);
+                                                    }
+
+                                                    // Determine if this is the last match for proper spacing
+                                                    $is_last_match = ($match_index === count($matched_restaurant_bookings[$room_number]) - 1);
+                                                ?>
+                                                    <div class="action-button-group<?php echo $is_last_match ? ' last-group' : ''; ?>">
+                                                    <?php if ($is_confirmed_match && $has_updates): ?>
+                                                        <button class="btn-check-updates" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'updates')">
+                                                            <span class="material-symbols-outlined">update</span> Check Updates
+                                                        </button>
+                                                    <?php elseif ($is_confirmed_match && !$has_updates): ?>
+                                                        <button class="btn-view-details" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'confirmed')">
+                                                            <span class="material-symbols-outlined">visibility</span> View Details
+                                                        </button>
+                                                    <?php elseif (!$is_confirmed_match): ?>
+                                                        <button class="btn-check-match" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'suggested')">
+                                                            <span class="material-symbols-outlined">search</span> Check Match
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    </div>
+                                                <?php endforeach; ?>
                                             <?php elseif ($has_booking): ?>
                                             <?php
                                             // Check if this booking requires a restaurant booking (has dinner package)
@@ -4455,31 +4572,41 @@ class Hotel_Booking_Table {
                                                     $has_matches = isset($matched_restaurant_bookings[$room_number]) && !empty($matched_restaurant_bookings[$room_number]);
 
                                                     if ($has_matches):
-                                                        $first_match = $matched_restaurant_bookings[$room_number][0];
-                                                        $is_confirmed_match = $first_match['match_info']['is_primary'];
-                                                        $match_unique_id = 'rest-' . $room_number . '-0';
+                                                        // Loop through ALL matches and show buttons for each
+                                                        foreach ($matched_restaurant_bookings[$room_number] as $match_index => $match_data):
+                                                            $is_confirmed_match = $match_data['match_info']['is_primary'];
+                                                            $match_unique_id = 'rest-' . $room_number . '-' . $match_index;
 
-                                                        // Check if there are suggested updates for confirmed matches
-                                                        $has_updates = false;
-                                                        if ($is_confirmed_match && isset($first_match['hotel_booking']) && isset($first_match['resos_booking'])) {
-                                                            $comp_check = $this->prepare_comparison_data($first_match['hotel_booking'], $first_match['resos_booking'], $input_date);
-                                                            $has_updates = !empty($comp_check['suggested_updates']);
-                                                        }
+                                                            // Get Resos booking ID and restaurant ID for View in Resos button
+                                                            $resos_booking_id = $match_data['resos_booking']['_id'] ?? $match_data['resos_booking']['id'] ?? '';
+                                                            $resos_restaurant_id = $match_data['resos_booking']['restaurantId'] ?? '';
 
-                                                        if ($is_confirmed_match && $has_updates):
-                                                    ?>
-                                                        <button class="btn-check-updates" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'updates')">
-                                                            <span class="material-symbols-outlined">update</span> Check Updates
-                                                        </button>
-                                                    <?php elseif ($is_confirmed_match && !$has_updates): ?>
-                                                        <button class="btn-view-details" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'confirmed')">
-                                                            <span class="material-symbols-outlined">visibility</span> View Details
-                                                        </button>
-                                                    <?php elseif (!$is_confirmed_match): ?>
-                                                        <button class="btn-check-match" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'suggested')">
-                                                            <span class="material-symbols-outlined">search</span> Check Match
-                                                        </button>
-                                                    <?php endif; ?>
+                                                            // Check if there are suggested updates for confirmed matches
+                                                            $has_updates = false;
+                                                            if ($is_confirmed_match && isset($match_data['hotel_booking']) && isset($match_data['resos_booking'])) {
+                                                                $comp_check = $this->prepare_comparison_data($match_data['hotel_booking'], $match_data['resos_booking'], $input_date);
+                                                                $has_updates = !empty($comp_check['suggested_updates']);
+                                                            }
+
+                                                            // Determine if this is the last match for proper spacing
+                                                            $is_last_match = ($match_index === count($matched_restaurant_bookings[$room_number]) - 1);
+                                                        ?>
+                                                            <div class="action-button-group<?php echo $is_last_match ? ' last-group' : ''; ?>">
+                                                            <?php if ($is_confirmed_match && $has_updates): ?>
+                                                                <button class="btn-check-updates" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'updates')">
+                                                                    <span class="material-symbols-outlined">update</span> Check Updates
+                                                                </button>
+                                                            <?php elseif ($is_confirmed_match && !$has_updates): ?>
+                                                                <button class="btn-view-details" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'confirmed')">
+                                                                    <span class="material-symbols-outlined">visibility</span> View Details
+                                                                </button>
+                                                            <?php elseif (!$is_confirmed_match): ?>
+                                                                <button class="btn-check-match" onclick="toggleComparisonRow('<?php echo esc_js($match_unique_id); ?>', '<?php echo esc_js($room_number); ?>', 'suggested')">
+                                                                    <span class="material-symbols-outlined">search</span> Check Match
+                                                                </button>
+                                                            <?php endif; ?>
+                                                            </div>
+                                                        <?php endforeach; ?>
                                                     <?php elseif ($has_booking): ?>
                                                     <?php
                                                     // Check if this booking requires a restaurant booking (has dinner package)
