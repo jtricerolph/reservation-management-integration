@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.6] - 2025-11-07
+
+### UI Improvements
+
+#### Booking Status and Source Icons in Timeline
+**Feature**: Status and source icons now appear inline with time and people count for cleaner, more informative layout.
+
+**Changes Made**:
+1. **Moved Status Icon**: Status icon relocated from match indicator to booking-time line (after people count)
+2. **Added Source Icon**: New source icon shows how booking was made (phone, website, walk-in, etc.)
+3. **Material Icons**: Both icons use Material Symbols font for consistent styling
+
+**Icon Positioning**:
+```
+Before: 18:00 (4 pax)
+        👍 Booking # match
+
+After:  18:00 (4 pax) 👍 📱
+        Booking # match
+```
+
+**Supported Source Types** (Material Icons):
+- **Walk-in**: `directions_walk` icon
+- **Website**: `language` icon
+- **Phone**: `phone` icon
+- **E-mail**: `email` icon
+- **Message**: `chat` icon
+- **Reserve with Google**: `search` icon
+- **Reserve with Facebook**: `share` icon (Facebook icon not in Material Symbols)
+- **Reserve with Instagram**: `photo_camera` icon
+- **API**: `settings_ethernet` icon
+- **Other/Unknown**: `more_horiz` icon
+
+**Technical Implementation**:
+- PHP: Added status and source icons to `.booking-time` div (lines 4233-4234, 4567-4568)
+- JavaScript: Created `getSourceIcon()` function mapping source types to Material Icons
+- JavaScript: Added `initializeSourceIcons()` function to render icons on page load
+- CSS: Updated `.booking-time` to flexbox layout with 6px gap between elements
+- CSS: Styled icons at 18px with appropriate opacity and colors
+- CSS: Different icon colors for confirmed (green) vs suggested (amber) matches
+
+**Source Data Field**:
+- Plugin checks for `source` or `originatedFrom` field in Resos booking data
+- Falls back to 'other' if field not present
+- Case-insensitive matching with normalization
+
+**Benefits**:
+- Cleaner layout with icons inline instead of stacked
+- Quick visual identification of booking status
+- New visibility into how bookings originated
+- Consistent Material Icons styling throughout interface
+- Tooltips show full status/source names on hover
+
+**Files Modified**:
+- reservation-management-integration.php: Added source icon output to both individual and grouped room sections
+- assets/staying-today.js: Added getSourceIcon() function and initializeSourceIcons()
+- assets/style.css: Updated booking-time styling and added icon-specific styles
+
+---
+
 ## [2.0.5] - 2025-11-07
 
 ### Enhanced Features

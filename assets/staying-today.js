@@ -92,6 +92,46 @@ window.getStatusIcon = function(status) {
 };
 
 /**
+ * Get Material Symbols icon name for booking source
+ * @param {string} source - The booking source
+ * @returns {string} - Material Symbols icon name for the source
+ *
+ * Resos source types: Walk-in, Website, Phone, E-mail, Message, Reserve with Google,
+ * Reserve with Facebook, Reserve with Instagram, API, Other
+ */
+window.getSourceIcon = function(source) {
+    var sourceLower = (source || '').toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    var icons = {
+        // Primary sources
+        'walk_in': 'directions_walk',                   // Walk-in
+        'walkin': 'directions_walk',                    // Walk-in (alt)
+        'website': 'language',                          // Website/Online
+        'phone': 'phone',                               // Phone call
+        'e_mail': 'email',                              // Email
+        'email': 'email',                               // Email (alt)
+        'message': 'chat',                              // Message/Chat
+        'messaging': 'chat',                            // Messaging (alt)
+
+        // Social/third party platforms
+        'reserve_with_google': 'search',                // Google Reserve
+        'google': 'search',                             // Google (short)
+        'reserve_with_facebook': 'facebook',            // Facebook (note: not in Material Symbols, using alternate)
+        'facebook': 'share',                            // Facebook (using share icon as fallback)
+        'reserve_with_instagram': 'photo_camera',       // Instagram
+        'instagram': 'photo_camera',                    // Instagram (alt)
+
+        // Technical sources
+        'api': 'settings_ethernet',                     // API
+        'integration': 'settings_ethernet',             // Integration (alt)
+
+        // Default/other
+        'other': 'more_horiz',                          // Other/Unknown
+        'unknown': 'more_horiz'                         // Unknown
+    };
+    return icons[sourceLower] || 'more_horiz';
+};
+
+/**
  * Find the opening hour ID and name for a given time
  * Accounts for booking duration - the END time must also be within opening hours
  * @param {string} time - Time in format "HH:MM" (e.g., "12:30")
@@ -146,15 +186,39 @@ window.initializeStatusIcons = function() {
         // Add Material Symbols class and set icon
         iconElement.classList.add('material-symbols-outlined');
         iconElement.textContent = iconName;
-        iconElement.setAttribute('title', status.charAt(0).toUpperCase() + status.slice(1));
+        iconElement.setAttribute('title', 'Status: ' + status.charAt(0).toUpperCase() + status.slice(1));
     });
 };
 
-// Initialize status icons when DOM is ready
+/**
+ * Initialize source icons on page load
+ */
+window.initializeSourceIcons = function() {
+    var sourceIcons = document.querySelectorAll('.source-icon[data-source]');
+    sourceIcons.forEach(function(iconElement) {
+        var source = iconElement.getAttribute('data-source');
+        var iconName = window.getSourceIcon(source);
+
+        // Add Material Symbols class and set icon
+        iconElement.classList.add('material-symbols-outlined');
+        iconElement.textContent = iconName;
+
+        // Format source name for title (e.g., "walk_in" -> "Walk In", "api" -> "API")
+        var displayName = source.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+        if (source.toLowerCase() === 'api') displayName = 'API';
+        iconElement.setAttribute('title', 'Source: ' + displayName);
+    });
+};
+
+// Initialize status and source icons when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initializeStatusIcons);
+    document.addEventListener('DOMContentLoaded', function() {
+        window.initializeStatusIcons();
+        window.initializeSourceIcons();
+    });
 } else {
     window.initializeStatusIcons();
+    window.initializeSourceIcons();
 }
 
 /**

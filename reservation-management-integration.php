@@ -3,7 +3,7 @@
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
  * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.5
+ * Version: 2.0.6
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -4230,10 +4230,11 @@ class Hotel_Booking_Table {
                                                         <div class="booking-time">
                                                             <?php echo esc_html($rest_booking['time']); ?>
                                                             (<?php echo esc_html($rest_booking['people']); ?> pax)
+                                                            <span class="status-icon" data-status="<?php echo esc_attr($rest_booking['resos_booking']['status'] ?? 'request'); ?>"></span>
+                                                            <span class="source-icon" data-source="<?php echo esc_attr($rest_booking['resos_booking']['source'] ?? $rest_booking['resos_booking']['originatedFrom'] ?? 'other'); ?>"></span>
                                                         </div>
                                                         <div class="match-indicator">
                                                             <small>
-                                                                <span class="status-icon" data-status="<?php echo esc_attr($rest_booking['resos_booking']['status'] ?? 'request'); ?>"></span>
                                                                 <?php if ($is_confirmed): ?>
                                                                     &#10004; Booking # match
                                                                 <?php else: ?>
@@ -4563,10 +4564,11 @@ class Hotel_Booking_Table {
                                                                 <div class="booking-time">
                                                                     <?php echo esc_html($rest_booking['time']); ?>
                                                                     (<?php echo esc_html($rest_booking['people']); ?> pax)
+                                                                    <span class="status-icon" data-status="<?php echo esc_attr($rest_booking['resos_booking']['status'] ?? 'request'); ?>"></span>
+                                                                    <span class="source-icon" data-source="<?php echo esc_attr($rest_booking['resos_booking']['source'] ?? $rest_booking['resos_booking']['originatedFrom'] ?? 'other'); ?>"></span>
                                                                 </div>
                                                                 <div class="match-indicator">
                                                                     <small>
-                                                                        <span class="status-icon" data-status="<?php echo esc_attr($rest_booking['resos_booking']['status'] ?? 'request'); ?>"></span>
                                                                         <?php if ($is_confirmed): ?>
                                                                             &#10004; Booking # match
                                                                         <?php else: ?>

@@ -337,6 +337,38 @@ html, body {
 .booking-time {
     color: #495057;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Status and Source icons in booking-time */
+.booking-time .status-icon,
+.booking-time .source-icon {
+    font-size: 18px;
+    vertical-align: middle;
+    opacity: 0.75;
+    flex-shrink: 0;
+}
+
+.booking-time .status-icon {
+    color: #495057;
+}
+
+.booking-time .source-icon {
+    color: #6c757d;
+}
+
+/* Confirmed match - green status icon */
+.restaurant-booking.confirmed-match .booking-time .status-icon {
+    color: #155724;
+    opacity: 0.85;
+}
+
+/* Suggested match - amber status icon */
+.restaurant-booking.suggested-match .booking-time .status-icon {
+    color: #856404;
+    opacity: 0.85;
 }
 
 .empty-cell {
