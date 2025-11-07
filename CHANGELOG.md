@@ -4,6 +4,152 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.3] - 2025-11-07
+
+### New Features
+
+#### "NOT-#xxxxx" Pattern for Excluding Specific Incorrect Booking Matches
+**Feature**: Staff can now exclude specific incorrect booking matches by adding restaurant notes with the pattern "NOT-#xxxxx" where xxxxx is the hotel booking ID that should not match.
+
+**Problem Solved**:
+- False suggested matches for common surnames (e.g., multiple "Smith" bookings)
+- Family gatherings where multiple family members have similar names/contact details
+- Booking sequence issues (restaurant booking created before hotel room assigned)
+- Non-resident bookings that incorrectly match hotel guests with similar details
+
+**How It Works**:
+1. Staff identifies an incorrect suggested match (e.g., Booking #12345)
+2. Adds restaurant note to the Resos booking: "NOT-#12345"
+3. System excludes that specific booking from matching
+4. Booking can still match OTHER hotel bookings (preserves future matching)
+
+**Supported Formats** (all case-insensitive):
+- `NOT-#12345` (recommended - most visible)
+- `NOT-12345` (works without # symbol)
+- `not-#12345` (lowercase accepted)
+- Multiple exclusions: `NOT-#12345 NOT-#67890`
+- Mixed with other notes: `Gluten-free. NOT-#12345. Window table.`
+
+**Example Scenarios**:
+
+**Family Gathering:**
+- Hotel: Room 101 (John Smith #12345), Room 102 (Jane Smith #67890)
+- Resos: "Smith party of 6"
+- Initially matches both as "suggested"
+- Add note: `NOT-#12345` (wrong room)
+- Result: Only matches Room 102 ✓
+
+**Common Surname:**
+- Multiple "Jones" hotel bookings
+- Resos walk-in: "Jones"
+- Add note: `NOT-#11111 NOT-#22222 NOT-#33333`
+- Result: Won't match any hotel Jones ✓
+
+**Booking Sequence:**
+- Restaurant booking created for "Brown" (no hotel booking yet)
+- Later, hotel booking #99999 created for different "Brown"
+- System incorrectly suggests match
+- Add note: `NOT-#99999`
+- Even later, correct hotel booking #88888 created
+- Result: Now correctly matches #88888 ✓
+
+**Technical Details**:
+- Pattern matching: `/NOT-#?(\d+)/i` (regex, case-insensitive)
+- Blocks: **ALL matching** for excluded booking IDs (note-based, surname, phone, email matches)
+- Early return: Function returns immediately with "no match" when exclusion detected
+- Prevents: Both PRIMARY (confirmed) and SECONDARY (suggested) matches
+- Does NOT affect: Custom field "Booking #" explicit assignments (PRIORITY 1-2)
+- Logging: Excluded matches logged to debug.log as "RMI: Booking #xxxxx explicitly excluded via NOT-# pattern"
+
+**User Workflow**:
+1. View incorrect suggested match in booking table
+2. Open Resos booking dashboard
+3. Add restaurant note: "NOT-#12345" (use exact format)
+4. Save and refresh hotel booking page
+5. Incorrect match no longer appears
+
+**Files Modified**:
+- `reservation-management-integration.php` (lines 3365-3378, 3381, 3394, 3407)
+
+**Version Incremented**: 2.0.2 → 2.0.3
+
+**Advantages Over Alternative Approaches**:
+- Granular control (exclude specific bookings, not all)
+- Preserves future matching potential
+- Handles complex scenarios (family gatherings, booking sequences)
+- Reversible (edit/delete note anytime)
+- Multiple exclusions supported
+- Audit trail via timestamped notes
+
+---
+
+## [2.0.2] - 2025-11-07
+
+### New Features
+
+#### Visual Alerts for Package Bookings Without Restaurant Reservations
+**Feature**: Automatically highlights hotel bookings with dinner packages (DBB) that don't have a matched restaurant booking.
+
+**Problem Solved**:
+- Package/DBB bookings include dinner as part of the rate and require a table reservation
+- Previously, these guests could be overlooked if no restaurant booking existed
+- Staff had to manually scan for package bookings without matches
+
+**Implementation**:
+
+**Visual Indicators**:
+- **Red warning notice** appears above Create Booking button: "⚠️ Package guest needs booking"
+- **Red button styling** (instead of green) with pulsing animation to draw attention
+- Applied to both individual rooms and grouped accommodations sections
+
+**How It Works**:
+1. Plugin checks if booking has dinner package via inventory items (existing logic)
+2. If booking has package AND no matched restaurant booking → shows warning + red button
+3. If booking has package AND has matched restaurant booking → normal display (no warning)
+4. If booking has no package → green button as usual
+
+**Technical Details**:
+- Uses existing `has_package` detection from inventory items
+- Checks for configured "Package Inventory Item Name" in settings (e.g., "Dinner Allocation")
+- Date-specific detection (only flags packages for the viewing date)
+- No JavaScript changes required - purely server-side rendering
+
+**CSS Styling** ([style.css](assets/style.css)):
+- `.package-no-match-warning` - Red bordered warning box with warning icon
+- `.btn-create-booking.requires-booking` - Red button with pulse animation
+- `@keyframes pulse-warning` - Subtle pulsing effect (2s loop)
+
+**Button States**:
+- Normal booking (no package): Green button
+- Package booking (no match): Red button with warning + pulse effect
+- Package booking (has match): No create button (shows match buttons instead)
+
+**User Experience**:
+- Clear visual hierarchy separates urgent (red) from routine (green) bookings
+- Warning message provides context: "Package guest needs booking"
+- Maintains all existing functionality - only adds visual emphasis
+
+**Configuration**:
+- No new settings required
+- Uses existing "Package Inventory Item Name" from Settings > Reservation Management
+- Works with any configured package text (e.g., "Dinner Allocation", "DBB", etc.)
+
+**Files Modified**:
+- `reservation-management-integration.php` (lines 4141-4161, 4464-4484)
+- `assets/style.css` (lines 488-532 added)
+
+**Version Incremented**: 2.0.1 → 2.0.2
+
+**Testing Scenarios**:
+1. ✅ Hotel booking WITH package + NO restaurant match → Red button + warning
+2. ✅ Hotel booking WITHOUT package + NO restaurant match → Green button, no warning
+3. ✅ Hotel booking WITH package + HAS restaurant match → No create button (shows match buttons)
+4. ✅ Hotel booking WITHOUT package + HAS restaurant match → No create button (shows match buttons)
+5. ✅ Grouped accommodations display warnings correctly
+6. ✅ Responsive design on mobile/tablet devices
+
+---
+
 ## [2.0.1] - 2025-11-06
 
 ### Bug Fixes

@@ -3,7 +3,7 @@
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
  * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.1
+ * Version: 2.0.3
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -18,8 +18,8 @@ if (!defined('ABSPATH')) {
 
 class Hotel_Booking_Table {
 
-    const VERSION = '2.0.1';
-    const JS_VERSION = '2.0.1';
+    const VERSION = '2.0.3';
+    const JS_VERSION = '2.0.3';
 
     private $errors = array();
     private $api_base_url = 'https://api.newbook.cloud/rest/';
@@ -3361,7 +3361,26 @@ class Hotel_Booking_Table {
                 );
             }
         }
-        
+
+        // NEW: Check for exclusion pattern "NOT-#12345" before attempting ANY matches
+        // This allows staff to exclude specific incorrect matches while preserving future matching potential
+        if (!empty($resos_notes) && !empty($hotel_booking_id)) {
+            // Extract all exclusion patterns: NOT-#12345 or NOT-12345 (case-insensitive)
+            preg_match_all('/NOT-#?(\d+)/i', $resos_notes, $exclusion_matches);
+            $excluded_bookings = isset($exclusion_matches[1]) ? $exclusion_matches[1] : array();
+
+            // Check if current hotel booking ID is in the exclusion list
+            if (in_array((string)$hotel_booking_id, $excluded_bookings, true)) {
+                error_log("RMI: Booking #{$hotel_booking_id} explicitly excluded via NOT-# pattern in notes");
+                // Return immediately - no match of any kind for this booking
+                return array(
+                    'matched' => false,
+                    'is_primary' => false,
+                    'confidence' => 'none'
+                );
+            }
+        }
+
         // PRIORITY 3: Check notes for booking ID
         if (!empty($resos_notes) && !empty($hotel_booking_id)) {
             if (stripos($resos_notes, $hotel_booking_id) !== false) {
@@ -4139,8 +4158,22 @@ class Hotel_Booking_Table {
                                                 </button>
                                             <?php endif; ?>
                                             <?php elseif ($has_booking): ?>
-                                            <button class="btn-create-booking"
+                                            <?php
+                                            // Check if this booking requires a restaurant booking (has dinner package)
+                                            $requires_booking = isset($guest_data['has_package']) && $guest_data['has_package'];
+                                            $button_class = $requires_booking ? 'btn-create-booking requires-booking' : 'btn-create-booking';
+                                            ?>
+
+                                            <?php if ($requires_booking): ?>
+                                            <div class="package-no-match-warning">
+                                                <span class="material-symbols-outlined">warning</span>
+                                                <strong>Package guest needs booking</strong>
+                                            </div>
+                                            <?php endif; ?>
+
+                                            <button class="<?php echo $button_class; ?>"
                                                     data-guest-info='<?php echo $guest_data_json; ?>'
+                                                    data-requires-booking="<?php echo $requires_booking ? 'true' : 'false'; ?>"
                                                     onclick="toggleCreateBookingRow('<?php echo esc_js($room_number); ?>', '<?php echo esc_js($input_date); ?>', <?php echo intval($total_party_size); ?>, this)">
                                                 <span class="material-symbols-outlined">add_circle</span> Create Booking
                                             </button>
@@ -4448,8 +4481,22 @@ class Hotel_Booking_Table {
                                                         </button>
                                                     <?php endif; ?>
                                                     <?php elseif ($has_booking): ?>
-                                                    <button class="btn-create-booking"
+                                                    <?php
+                                                    // Check if this booking requires a restaurant booking (has dinner package)
+                                                    $requires_booking = isset($guest_data['has_package']) && $guest_data['has_package'];
+                                                    $button_class = $requires_booking ? 'btn-create-booking requires-booking' : 'btn-create-booking';
+                                                    ?>
+
+                                                    <?php if ($requires_booking): ?>
+                                                    <div class="package-no-match-warning">
+                                                        <span class="material-symbols-outlined">warning</span>
+                                                        <strong>Package guest needs booking</strong>
+                                                    </div>
+                                                    <?php endif; ?>
+
+                                                    <button class="<?php echo $button_class; ?>"
                                                             data-guest-info='<?php echo $guest_data_json; ?>'
+                                                            data-requires-booking="<?php echo $requires_booking ? 'true' : 'false'; ?>"
                                                             onclick="toggleCreateBookingRow('<?php echo esc_js($room_number); ?>', '<?php echo esc_js($input_date); ?>', <?php echo intval($total_party_size); ?>, this)">
                                                         <span class="material-symbols-outlined">add_circle</span> Create Booking
                                                     </button>
