@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.5] - 2025-11-07
+
+### Enhanced Features
+
+#### Exclusion Note Matching Logic
+**Feature**: Plugin now respects manual exclusion notes when matching hotel bookings to restaurant reservations.
+
+**How It Works**:
+- Before any matching logic runs, checks if Resos booking has "NOT-#{hotel_booking_id}" note
+- If found, immediately excludes that Resos booking from matching this specific hotel booking
+- Prevents previously excluded matches from reappearing in future searches
+- Works seamlessly with v2.0.4's "Exclude Match" button feature
+
+**Technical Details**:
+- Added exclusion check at beginning of `match_resos_to_hotel_booking()` function (line ~3446)
+- Checks `restaurantNotes` field for exclusion pattern
+- Case-insensitive pattern matching for reliability
+- Returns `matched: false, excluded: true` when exclusion note found
+
+**Workflow**:
+1. Staff uses "Exclude Match" button on incorrect match
+2. System adds "NOT-#{booking_id}" note to Resos booking via API
+3. On next page load/refresh, that Resos booking no longer matches this hotel booking
+4. Result: Cleaner match display, no repeat false positives
+
+**Benefits**:
+- Respects staff decisions across page refreshes
+- Reduces clutter from repeat false positive matches
+- Better user experience with accurate match results
+- Works with both front-end plugin and Booking Match API
+
+**Integration with v2.0.4**:
+- v2.0.4 added "Exclude Match" button to create exclusion notes
+- v2.0.5 makes matching engine respect those exclusion notes
+- Complete exclusion workflow now functional end-to-end
+
+---
+
 ## [2.0.4] - 2025-11-07
 
 ### New Features

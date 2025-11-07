@@ -3,7 +3,7 @@
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
  * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.4
+ * Version: 2.0.5
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -3442,7 +3442,21 @@ class Hotel_Booking_Table {
         $resos_surname = $this->extract_surname($resos_guest_name);
         $resos_phone = isset($resos_booking['guest']['phone']) ? trim($resos_booking['guest']['phone']) : '';
         $resos_email = isset($resos_booking['guest']['email']) ? trim($resos_booking['guest']['email']) : '';
-        
+
+        // Check for exclusion notes FIRST (before any matching logic)
+        // If Resos booking has "NOT-#{hotel_booking_id}" note, exclude it from matching
+        if (!empty($hotel_booking_id)) {
+            $exclusion_pattern = 'NOT-#' . $hotel_booking_id;
+            if (stripos($resos_notes, $exclusion_pattern) !== false) {
+                // This match has been explicitly excluded
+                return array(
+                    'matched' => false,
+                    'excluded' => true,
+                    'exclusion_reason' => 'Manual exclusion note found'
+                );
+            }
+        }
+
         // PRIORITY 1: Direct hotel booking number match (from custom field)
         if (!empty($resos_hotel_booking_ref) && !empty($hotel_booking_id)) {
             if ($resos_hotel_booking_ref == $hotel_booking_id) {
