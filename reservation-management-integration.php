@@ -2,8 +2,9 @@
 /**
  * Plugin Name: Reservation Management Integration for NewBook & ResOS
  * Plugin URI: https://yourwebsite.com
- * Description: Integrates NewBook PMS hotel bookings with ResOS restaurant reservations. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
- * Version: 2.0.6
+ * Description: UI and management interface for hotel/restaurant booking integration. Displays bookings, enables matching, and allows creation/updating of restaurant bookings. Use shortcode [hotel-table-bookings-by-date] or [rmi-bookings-table]
+ * Version: 3.0.0
+ * Requires Plugins: booking-match-api
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
@@ -3354,10 +3355,27 @@ class Hotel_Booking_Table {
     /**
      * Match Resos bookings to hotel bookings
      * Returns array with match type and confidence
+     *
+     * DEPRECATED as of v3.0.0 - Now uses BMA_Matcher from Booking Match API plugin
+     *
+     * @deprecated 3.0.0 Use BMA_Matcher::match_resos_to_hotel() instead
      */
     private function match_resos_to_hotel_booking($resos_booking, $hotel_booking) {
+        // DEPRECATED: This method now redirects to the Booking Match API plugin's matcher
+        // All ~280 lines of matching logic have been moved to BMA_Matcher class
+        $matcher = new BMA_Matcher();
+        $date = date('Y-m-d'); // Use current date as default
+        return $matcher->match_resos_to_hotel($resos_booking, $hotel_booking, $date);
+    }
+
+    /**
+     * ORIGINAL METHOD BODY REMOVED IN v3.0.0
+     * The matching logic (280+ lines) is now in: booking-match-api/includes/class-bma-matcher.php
+     * See git history before v3.0.0 to view the old implementation
+     */
+    private function match_resos_to_hotel_booking_OLD_REMOVED_V3($resos_booking, $hotel_booking) {
         $matches = array();
-        
+
         // Extract hotel booking identifiers
         $hotel_booking_id = isset($hotel_booking['booking_id']) ? strval($hotel_booking['booking_id']) : '';
         $hotel_agent_ref = isset($hotel_booking['booking_reference_id']) ? strval($hotel_booking['booking_reference_id']) : '';
@@ -3799,15 +3817,19 @@ class Hotel_Booking_Table {
         
         // Match restaurant bookings to hotel bookings
         $matched_restaurant_bookings = array();
-        
+
+        // Use BMA_Matcher from Booking Match API plugin (required dependency)
+        $matcher = new BMA_Matcher();
+
         if (!empty($restaurant_bookings) && is_array($restaurant_bookings)) {
             foreach ($restaurant_bookings as $rest_booking) {
                 $best_match = null;
                 $best_match_room = null;
-                
+
                 // Try to match against each hotel booking
                 foreach ($bookings_by_room as $room_num => $hotel_booking) {
-                    $match_result = $this->match_resos_to_hotel_booking($rest_booking, $hotel_booking);
+                    // Use API plugin's matcher instead of internal method
+                    $match_result = $matcher->match_resos_to_hotel($rest_booking, $hotel_booking, $input_date);
                     
                     if ($match_result['matched']) {
                         // If this is a primary match (booking ID or agent ref), use it immediately
